@@ -6,10 +6,11 @@ class PDFState:
         self.current_page = 0
         self.doc = None
         self.total_pages = 0
+        self.highlight_mode = False
 
 pdf_state = PDFState()
 
-def process_pdf(pdf_file):
+def process_pdf(pdf_file, highlight_fields):
     if pdf_file is None:
         return None, None, "Please upload a PDF file"
     
@@ -18,6 +19,15 @@ def process_pdf(pdf_file):
         pdf_state.doc = fitz.open(pdf_file.name)
         pdf_state.total_pages = pdf_state.doc.page_count
         pdf_state.current_page = 0
+        
+        if highlight_fields:
+            # Highlight form fields if requested
+            for page in pdf_state.doc:
+                widgets = page.widgets()
+                if widgets:
+                    for widget in widgets:
+                        rect = widget.rect
+                        page.draw_rect(rect, color=(1, 0, 0), width=2)
         
         # Get the first page
         return display_page(0)
@@ -68,7 +78,10 @@ with gr.Blocks() as demo:
         # Left column for PDF
         with gr.Column(scale=2):
             gr.Markdown("### PDF Viewer")
-            file_input = gr.File(label="Upload PDF", file_types=[".pdf"])
+            with gr.Row():
+                file_input = gr.File(label="Upload PDF", file_types=[".pdf"])
+                highlight_checkbox = gr.Checkbox(label="Highlight Form Fields", value=False)
+            
             image_output = gr.Image(label="Page Preview")
             
             with gr.Row():
@@ -100,7 +113,7 @@ with gr.Blocks() as demo:
     # PDF handling
     file_input.change(
         fn=process_pdf,
-        inputs=[file_input],
+        inputs=[file_input, highlight_checkbox],
         outputs=[image_output, page_info, status_text]
     )
     

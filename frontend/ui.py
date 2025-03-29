@@ -68,7 +68,13 @@ def prev_page():
     return display_page(pdf_state.current_page)
 
 def chat_response(message, history):
-    return f"You asked: {message}"
+    # Format the response as a list of message dictionaries
+    if history is None:
+        history = []
+    history.append({"role": "user", "content": message})
+    bot_message = f"You asked: {message}"
+    history.append({"role": "assistant", "content": bot_message})
+    return history
 
 with gr.Blocks() as demo:
     with gr.Row():

@@ -1,20 +1,60 @@
-Inspiration
-Growing up as first-generation Americans, we often had to translate important documents for our parents - a task that was both stressful and confusing at such young age. That experience inspired us to create a tool that eases this burden for first gen children, empowering families through accessible communication and understanding of legal documents.
+# DocuChisme
 
-What it does
-Our tool allows the user to upload a fillable pdf and instantly receive a translated summary. It generates a step-by-step action list, translating each section of the form and allowing users to modify the PDF directly. The finalized form will also be available for download. Users can interact with a chatbot that answers questions about the PDF and will provide helpful resources, all in Spanish.
+DocuChisme is a translation tool designed to ease the burden of understanding and completing legal documents for first-generation families. Inspired by personal experiences, our tool empowers users with accessible communication and efficient document handling.
 
-How we built it
-We utilized Gradio to build the frontend and display the uploaded PDFs. We used a variety of Python PDF libraries, such as PyMuPDF, to scan the PDFs to detect and extract fillable form fields. We primarily utilized Gemini for translation and document question and answering, enabling seamless support and useful responses.
+---
 
-Challenges we ran into
-We heavily struggled at first with parsing a variety of PDFs. We used a multitude of open source tools and some with a free trial from Apryes SDK, LAyout parser, Amazon Textract etc. All of these solutions varied from local deployment to setting up our very own hugging face endpoints. None of them accurately detected the layout of the PDF. We eventaully found out that flat PDFs are really hard to detect the structure of, with Acroform PDFs being the easiest to detect. We also struggled to visualize the PDFs and modifying them since Gradio does not provide web support for viewing PDFs like many Javascript libraries do.
+## Inspiration
 
-Accomplishments that we're proud of
-We are proud to be able to provide real time translation for documents in the form of action steps, helping the user fill out the form on the go, as well as accurate translation for interfacing with the AI model on document questions and answering.
+Growing up as first-generation Americans, we often had to translate important documents for our parents—a task that was both stressful and confusing at a young age. This experience inspired us to create a tool that lightens the load for first-gen children, empowering families through accessible communication and a better understanding of legal documents.
 
-What we learned
-We gained hands-on experience using Gradio as both a frontend and backend framework, along with learning about its ease of integration and limitations with PDF visualization. We also learned the differences found in PDF forms and though critically on how to approach these conflicts. Additionally, we learned how to leverage language models effectively for translation and document-based question answering.
+---
 
-What's next for DocuChisme
-Broader support for all PDF types, cleaner PDF modification (click on the file itself)
+## What It Does
+
+- **Instant Translation:** Upload a fillable PDF and receive a translated summary immediately.
+- **Actionable Steps:** Generates a step-by-step action list by translating each section of the form.
+- **Editable PDFs:** Enables direct modifications to the PDF, with the finalized form available for download.
+- **Interactive Chatbot:** Provides a chatbot that answers questions about the PDF and offers helpful resources—all in Spanish.
+
+---
+
+## How We Built It
+
+- **Frontend:** Built with [Gradio](https://gradio.app/) to showcase and interact with uploaded PDFs.
+- **PDF Processing:** Leveraged Python libraries such as [PyMuPDF](https://pymupdf.readthedocs.io/) for scanning PDFs and extracting fillable form fields.
+- **Translation & Q&A:** Utilized Gemini to power translation and document-based question answering, ensuring seamless support and useful responses.
+
+---
+
+## Challenges We Ran Into
+
+- **Parsing Varied PDFs:** 
+  - We experimented with multiple open source tools and free trials (e.g., Apryes SDK, LAyout Parser, Amazon Textract) to parse different PDF formats.
+  - Found that flat PDFs are especially challenging for detecting structure, whereas Acroform PDFs are easier to handle.
+- **Visualization & Modification:** 
+  - Struggled with visualizing PDFs and modifying them within Gradio, which lacks the web support provided by many JavaScript libraries.
+
+---
+
+## Accomplishments We're Proud Of
+
+- **Real-Time Translation:** Offering live translation of documents into actionable steps to assist users in filling out forms on the go.
+- **Accurate AI Integration:** Achieving precise translation and effective document question answering through our AI model integration.
+
+---
+
+## What We Learned
+
+- **Gradio’s Versatility:** Gained hands-on experience using Gradio as both a frontend and backend framework, along with an understanding of its PDF visualization limitations.
+- **Understanding PDF Forms:** Learned about the differences among PDF forms and developed strategies to address their unique challenges.
+- **Effective Use of Language Models:** Explored how to leverage language models for accurate translation and efficient document-based Q&A.
+
+---
+
+## What's Next for DocuChisme
+
+- **Enhanced PDF Support:** Expanding to support all types of PDFs.
+- **Improved Editing:** Developing a cleaner PDF modification experience, including direct interaction with the file itself.
+
+---

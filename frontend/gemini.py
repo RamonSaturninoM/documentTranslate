@@ -2,7 +2,7 @@ from google import genai
 from google.genai import types
 import pathlib
 
-API_KEY = "AIzaSyDO-3Vtl-fFTei6qjCVKrlXCnFumNWLQzo"
+API_KEY = ""
 # GLOBAL_CONFIG = types.GenerateContentConfig(
 #         max_output_tokens=500,
 #         temperature=0.1,

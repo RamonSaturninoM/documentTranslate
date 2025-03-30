@@ -1,6 +1,7 @@
 import gradio as gr
 import fitz  # PyMuPDF for PDF handling
 from gemini import get_summary, open_chat, send_message
+import uuid
 
 class PDFState:
     def __init__(self):
@@ -12,6 +13,8 @@ class PDFState:
 
 pdf_state = PDFState()
 chat = None  # Persistent Gemini chat session
+
+counter = 0
 
 def process_pdf(pdf_file, highlight_fields):
     global chat
@@ -120,11 +123,8 @@ def modify_pdf(pdf_file):
         output_path = "modified_pdf.pdf"
         doc.save(output_path)
         doc.close()
+             
 
-        # Get widgets names
-        result = extract_field_names(pdf_file)
-        print(result)
-        
         # Update global PDF state with the modified document
         pdf_state.doc = fitz.open(output_path)
         pdf_state.total_pages = pdf_state.doc.page_count
@@ -136,6 +136,108 @@ def modify_pdf(pdf_file):
     
     except Exception as e:
         return None, None, f"Error modifying PDF: {str(e)}", None
+    
+
+
+def update_field_text(pdf_file, text_input, field_name):
+    """
+    Updates a specific field in the PDF with user input text.
+    
+    Args:
+        pdf_file: The uploaded PDF file
+        field_name: The name of the field to update
+        text_input: Text to insert into the field
+    
+    Returns:
+        Updated image, page info, status message
+    """
+    if pdf_file is None:
+        return None, None, "Please upload a PDF file first"
+    
+    try:
+        # Get the widget by field name
+        
+
+        widget, msg = get_widget_by_field_name(pdf_file, field_name)
+        
+        if widget is None:
+            return None, None, f"Field not found: {msg}"
+        
+        # Open the PDF document
+        doc = pdf_state.doc
+        
+        # Find the page that contains this widget
+        target_page = None
+        for page_num, page in enumerate(doc):
+            widgets = page.widgets()
+            if widgets:
+                for w in widgets:
+                    if w.field_name == field_name:
+                        target_page = page
+                        break
+                if target_page:
+                    break
+        
+        if not target_page:
+            doc.close()
+            return None, None, f"Could not find page for widget {field_name}"
+            
+        # Get the widget's rectangle
+        rect = widget.rect
+        
+        # Calculate appropriate font size and position
+        available_width = rect.width
+        available_height = rect.height
+        
+        # Start with max font size, but constrain by the available height
+        fontsize = min(12, available_height)
+        
+        # Measure the text width at this font size
+        text_width = fitz.get_text_length(text_input, fontname="helv", fontsize=fontsize)
+        
+        # If the text is too wide, scale the font size down proportionally
+        if text_width > available_width:
+            fontsize = fontsize * (available_width / text_width)
+            # Also ensure we don't exceed the height
+            fontsize = min(fontsize, available_height)
+        
+        # Ensure the font size is not below the minimum
+        if fontsize < 4:
+            fontsize = 4
+        
+        # Calculate text position (centered vertically in the field)
+        center_y = (rect.y0 + rect.y1) / 2
+        adjusted_point = fitz.Point(rect.x0, center_y + fontsize/3)
+        
+        # Add text to the form field
+        target_page.insert_text(
+            adjusted_point,
+            text_input,
+            fontname="helv",
+            fontsize=fontsize,
+            color=(0, 0, 0)
+        )
+        
+       
+        
+        # Save the modified PDF
+        output_path = f"updated_pdf_{uuid.uuid4().hex}.pdf"
+        doc.save(output_path)
+        doc.close()
+        
+        # Update global PDF state with the modified document
+        pdf_state.doc = fitz.open(output_path)
+        pdf_state.current_page = 0  # Reset to first page
+        
+        # Display the updated PDF
+        img_path, page_info, msg = display_page(0)
+
+        
+        return img_path, page_info, f"Field '{field_name}' updated successfully"
+        
+    except Exception as e:
+        return None, None, f"Error updating field: {str(e)}"
+
 
 def extract_field_names(pdf_file):
     if pdf_file is None:
@@ -180,6 +282,43 @@ def get_widget_by_field_name(pdf_file, target_field_name):
     except Exception as e:
         return None, f"Error accessing widget: {str(e)}"
     
+def get_field_name_by_index(pdf_file, index):
+    field_data, _ = extract_field_names(pdf_file)
+    all_fields = []
+    for page_fields in field_data.values():
+        all_fields.extend(page_fields)
+
+    if index < len(all_fields):
+        return all_fields[index]
+    else:
+        return None
+
+# def load_field_label(pdf_file):
+#     global counter
+#     field_name = get_field_name_by_index(pdf_file, counter)
+#     new_direction = send_message(f"The user is trying to fill out a document in english when they dont know english. Create a direction in spanish using the field {field_name} telling the user to fill in whatever needs to go in the field. It might be shortned, this is mostly liekly for a legal document.")
+#     if field_name:
+#         counter += 1
+#         return gr.update(label=f"Update the field '{field_name}' ↓"), field_name
+#     else:
+#         return gr.update(label="No more fields!"), ""
+def load_field_label(pdf_file):
+    global counter
+    field_name = get_field_name_by_index(pdf_file, counter)
+
+    if field_name:
+        # Use Gemini to generate a Spanish instruction
+        new_direction = send_message(
+            f"The user is trying to fill out a document in English when they don't know English. "
+            f"Create a direction in Spanish using the field name '{field_name}', telling the user what to fill in. "
+            f"Keep it short, since this is likely a legal document."
+        )
+
+        counter += 1
+        return gr.update(label=new_direction), field_name
+    else:
+        return gr.update(label="No more fields!"), ""
+    
 
 
 with gr.Blocks() as demo:
@@ -207,6 +346,15 @@ with gr.Blocks() as demo:
             gr.Markdown("### Resumen automático")
             summary_output = gr.Textbox(label="Resumen de Gemini", lines=20, interactive=False)
 
+            # 🔽 Update Fields UI goes here
+            gr.Markdown("### Rellena los espacios en blanco")
+            with gr.Row():
+                field_text_input = gr.Textbox(label="Update the field ↓")
+                field_name_state = gr.State("")
+            with gr.Row():
+                load_field_button = gr.Button(" Ir al siguiente espacio")
+                update_field_button = gr.Button("Guardar cambios en el espacio")
+
             gr.Markdown("### Gemini Chat")
             chatbot = gr.Chatbot(label="Pregúntale a Gemini sobre el PDF")
             with gr.Row():
@@ -218,6 +366,29 @@ with gr.Blocks() as demo:
             
             # Download component for the modified PDF
             download_file = gr.File(label="Descargar PDF modificado")
+    
+   
+
+    # Load next field and update label/state
+    load_field_button.click(
+        fn=load_field_label,
+        inputs=[file_input],
+        outputs=[field_text_input, field_name_state]
+    )
+
+    # Update the field with user input and field name from state
+    update_field_button.click(
+        fn=update_field_text,
+        inputs=[file_input, field_text_input, field_name_state],
+        outputs=[image_output, page_info, status_text]
+    )
+
+    # Add the click event handler
+#     update_field_button.click(
+#         fn=update_field_text,
+#         inputs=[file_input, field_text_input, field_name],
+#         outputs=[image_output, page_info, status_text]
+# )
 
 
         
@@ -241,6 +412,10 @@ with gr.Blocks() as demo:
         #         clear = gr.Button("Limpiar", scale=1)
     
     # PDF processing when file is uploaded
+
+    
+
+
     file_input.change(
         fn=process_pdf,
         inputs=[file_input, highlight_checkbox],

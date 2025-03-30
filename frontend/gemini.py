@@ -16,7 +16,7 @@ API_KEY = "AIzaSyDO-3Vtl-fFTei6qjCVKrlXCnFumNWLQzo"
 client = genai.Client(api_key=API_KEY)
 chat = client.chats.create(model="gemini-2.0-flash")
 
-def get_summary(pdf_file_path, language = "español"):
+def get_summary(pdf_file_path, language="español"):
     summary_prompt = f"""Read the legal document below carefully. Your main task is to generate a succinct summary in {language} that captures the following in just a couple of sentences:
     - **Type and Purpose:** What type of legal document it is and its overall purpose.
     - **Parties Involved:** Who the parties are.
@@ -34,28 +34,40 @@ def get_summary(pdf_file_path, language = "español"):
 
     response = client.models.generate_content_stream(
         model="gemini-2.0-flash",
-        contents = [summary_prompt, pdf_part]
-
+        contents=[summary_prompt, pdf_part]
     )
-    # for chunk in response:
-        # print(chunk.text, end="")
 
-    return response
+    # Collect all chunks into a final summary string
+    return "".join(chunk.text for chunk in response if hasattr(chunk, "text"))
 
+def open_chat(pdf_file_path, language="español"):
+    global chat
 
+    # Load PDF
+    pdf_bytes = pathlib.Path(pdf_file_path).read_bytes()
+    pdf_part = types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
 
-response = get_summary("./32912.pdf")
+    # Create chat session (no system_instruction param)
+    chat = client.chats.create(model="gemini-2.0-flash")
 
-for chunk in response:
-    print(chunk.text, end="")
+    # Send system prompt + document as a single message
+    prompt = f"""
+    You are a helpful assistant that always communicates in {language}.
+    Answer all questions using the following legal document. If uncertain, say so.
 
-# content = input().strip().lower()
-# while content != "exit":
-#     response = chat.send_message_stream(content, config=GLOBAL_CONFIG)
-#     for chunk in response:
-#         print(chunk.text, end="")
-#     content = input().strip()
-#
-# for message in chat.get_history():
-#     print(f'role - {message.role}', end=": ")
-#     print(message.parts[0].text)
+    Be concise, factual, and polite. Use the document for context, 
+    but if you are uncertain, feel free to search for appropriate sources.
+    When the user has concerns about specfic situations then please provide sources that 
+    would benefit the user.
+    """
+
+    # Send both prompt + PDF together
+    chat.send_message([prompt, pdf_part])
+
+    return chat
+
+def send_message(message):
+    if chat is None:
+        raise Exception("Chat session not initialized")
+    response = chat.send_message(message)
+    return response.text

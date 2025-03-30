@@ -1,5 +1,6 @@
 import gradio as gr
 import fitz  # PyMuPDF for PDF handling
+from gemini import get_summary, open_chat, send_message
 
 class PDFState:
     def __init__(self):
@@ -7,12 +8,15 @@ class PDFState:
         self.doc = None
         self.total_pages = 0
         self.highlight_mode = False
+        self.summary = ""
 
 pdf_state = PDFState()
+chat = None  # Persistent Gemini chat session
 
 def process_pdf(pdf_file, highlight_fields):
+    global chat
     if pdf_file is None:
-        return None, None, "Please upload a PDF file"
+        return None, None, "Por favor, cargue un archivo PDF", ""
     
     try:
         # Open the PDF file and store it in state
@@ -29,15 +33,19 @@ def process_pdf(pdf_file, highlight_fields):
                         rect = widget.rect
                         page.draw_rect(rect, color=(1, 0, 0), width=2)
         
+        pdf_state.summary = get_summary(pdf_file.name)
+        chat = open_chat(pdf_file.name)
+        
         # Display the first page
-        return display_page(0)
+        img_path, page_info, status = display_page(0)
+        return img_path, page_info, status, pdf_state.summary
     except Exception as e:
         return None, None, f"Error processing PDF: {str(e)}"
 
 def display_page(page_num):
     try:
         if pdf_state.doc is None:
-            return None, None, "No PDF loaded"
+            return None, None, "No hay PDF cargado"
         
         # Get the requested page and convert it to an image
         page = pdf_state.doc[page_num]
@@ -45,24 +53,30 @@ def display_page(page_num):
         img_path = "temp_page.png"
         pix.save(img_path)
         
-        page_info = f"Page {page_num + 1} of {pdf_state.total_pages}"
-        return img_path, page_info, f"Displaying page {page_num + 1}"
+        page_info = f"Página {page_num + 1} of {pdf_state.total_pages}"
+        return img_path, page_info, f"Mostrando página {page_num + 1}"
     except Exception as e:
-        return None, None, f"Error displaying page: {str(e)}"
+        return None, None, f"Error al mostrar la página: {str(e)}"
 
 def next_page():
     if pdf_state.doc is None:
-        return None, None, "No PDF loaded"
+        return None, None, "No hay PDF cargado"
     
     pdf_state.current_page = min(pdf_state.current_page + 1, pdf_state.total_pages - 1)
     return display_page(pdf_state.current_page)
 
 def prev_page():
     if pdf_state.doc is None:
-        return None, None, "No PDF loaded"
+        return None, None, "No hay PDF cargado"
     
     pdf_state.current_page = max(pdf_state.current_page - 1, 0)
     return display_page(pdf_state.current_page)
+
+def handle_user_message(user_message, chat_history):
+    response = send_message(user_message)
+    chat_history = chat_history or []
+    chat_history.append((user_message, response))
+    return chat_history
 
 def modify_pdf(pdf_file):
     """
@@ -119,65 +133,77 @@ def modify_pdf(pdf_file):
     except Exception as e:
         return None, None, f"Error modifying PDF: {str(e)}", None
 
-def chat_response(message, history):
-    if history is None:
-        history = []
-    history.append({"role": "user", "content": message})
-    bot_message = f"You asked: {message}"
-    history.append({"role": "assistant", "content": bot_message})
-    return history
+# def chat_response(message, history):
+#     if history is None:
+#         history = []
+#     history.append({"role": "user", "content": message})
+#     bot_message = f"You asked: {message}"
+#     history.append({"role": "assistant", "content": bot_message})
+#     return history
 
 with gr.Blocks() as demo:
     with gr.Row():
-        gr.Markdown("# PDF Uploader and Viewer with Chat")
+        gr.Markdown("# Visor de PDF con resumen automático + Gemini Chat")
     
     with gr.Row():
         # Left column for PDF handling
         with gr.Column(scale=2):
-            gr.Markdown("### PDF Viewer")
+            gr.Markdown("### Visor de PDF")
             with gr.Row():
-                file_input = gr.File(label="Upload PDF", file_types=[".pdf"])
-                highlight_checkbox = gr.Checkbox(label="Highlight Form Fields (temporary)", value=False)
+                file_input = gr.File(label="Subir PDF", file_types=[".pdf"])
+                highlight_checkbox = gr.Checkbox(label="Resaltar campos de formulario (temporalmente)", value=False)
             
-            image_output = gr.Image(label="Page Preview")
+            image_output = gr.Image(label="Vista previa de página")
             
             with gr.Row():
-                prev_button = gr.Button("← Previous Page")
-                page_info = gr.Textbox(label="Page Information", interactive=False)
-                next_button = gr.Button("Next Page →")
+                prev_button = gr.Button("← Página anterior")
+                page_info = gr.Textbox(label="Información de la página", interactive=False)
+                next_button = gr.Button("Página siguiente →")
             
-            status_text = gr.Textbox(label="Status", interactive=False)
+            status_text = gr.Textbox(label="Estado", interactive=False)
+        
+        with gr.Column(scale=1):
+            gr.Markdown("### Resumen automático")
+            summary_output = gr.Textbox(label="Resumen de Gemini", lines=20, interactive=False)
+
+            gr.Markdown("### Gemini Chat")
+            chatbot = gr.Chatbot(label="Pregúntale a Gemini sobre el PDF")
+            with gr.Row():
+                user_msg = gr.Textbox(placeholder="Haz una pregunta...")
+                send_btn = gr.Button("Enviar")
             
             # Button to permanently modify and save the PDF with highlights
-            modify_button = gr.Button("Modify PDF (Save Highlights)")
+            modify_button = gr.Button("Modificar PDF (Guardar resaltes)")
             
             # Download component for the modified PDF
-            download_file = gr.File(label="Download Modified PDF")
+            download_file = gr.File(label="Descargar PDF modificado")
+
+
         
-        # Right column for Chat
-        with gr.Column(scale=1):
-            gr.Markdown("### Chat")
-            chatbot = gr.Chatbot(
-                label="Chat History",
-                height=400,
-                container=True,
-                type="messages",
-                show_label=True
-            )
-            with gr.Row():
-                msg = gr.Textbox(
-                    label="Message",
-                    placeholder="Type your message here...",
-                    container=True,
-                    scale=4
-                )
-                clear = gr.Button("Clear", scale=1)
+        # # Right column for Chat
+        # with gr.Column(scale=1):
+        #     gr.Markdown("### Chat")
+        #     chatbot = gr.Chatbot(
+        #         label="Historial de chat",
+        #         height=400,
+        #         container=True,
+        #         type="messages",
+        #         show_label=True
+        #     )
+        #     with gr.Row():
+        #         msg = gr.Textbox(
+        #             label="Mensaje",
+        #             placeholder="Escribe tu mensaje aquí...",
+        #             container=True,
+        #             scale=4
+        #         )
+        #         clear = gr.Button("Limpiar", scale=1)
     
     # PDF processing when file is uploaded
     file_input.change(
         fn=process_pdf,
         inputs=[file_input, highlight_checkbox],
-        outputs=[image_output, page_info, status_text]
+        outputs=[image_output, page_info, status_text, summary_output]
     )
     
     # Page navigation
@@ -199,14 +225,22 @@ with gr.Blocks() as demo:
         inputs=[file_input],
         outputs=[image_output, page_info, status_text, download_file]
     )
-    
-    # Chat handling
-    msg.submit(
-        fn=chat_response,
-        inputs=[msg, chatbot],
+
+    send_btn.click(
+        fn=handle_user_message,
+        inputs=[user_msg, chatbot],
         outputs=[chatbot]
     )
-    clear.click(lambda: None, None, chatbot, queue=False)
+    
+    # Chat handling
+    # msg.submit(
+    #     fn=chat_response,
+    #     inputs=[msg, chatbot],
+    #     outputs=[chatbot]
+    # )
+    # clear.click(lambda: None, None, chatbot, queue=False)
+
+    
 
 if __name__ == "__main__":
     demo.launch()

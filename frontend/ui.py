@@ -180,6 +180,34 @@ def get_widget_by_field_name(pdf_file, target_field_name):
     except Exception as e:
         return None, f"Error accessing widget: {str(e)}"
     
+def user_input(pdf_file):
+    if pdf_file is None:
+        return None, "Please upload a PDF file"
+    
+    try:
+        # Get field names first
+        field_data, msg = extract_field_names(pdf_file)
+        if field_data is None:
+            return None, msg
+            
+        # Create input prompts for each field
+        user_inputs = {}
+        for page_num, fields in field_data.items():
+            for field_name in fields:
+                # Get the widget to determine its type
+                widget, _ = get_widget_by_field_name(pdf_file, field_name)
+                if widget:
+                    # Create text input box for each field
+                    with gr.Box():
+                        gr.Markdown(f"Field: {field_name}")
+                        value = gr.Textbox(label=f"Enter value for {field_name}")
+                        user_inputs[field_name] = value
+                    
+        return user_inputs, "User inputs collected successfully!"
+        
+    except Exception as e:
+        return None, f"Error getting user input: {str(e)}"
+    
 
 
 with gr.Blocks() as demo:

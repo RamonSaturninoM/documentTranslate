@@ -120,6 +120,10 @@ def modify_pdf(pdf_file):
         output_path = "modified_pdf.pdf"
         doc.save(output_path)
         doc.close()
+
+        # Get widgets names
+        result = extract_field_names(pdf_file)
+        print(result)
         
         # Update global PDF state with the modified document
         pdf_state.doc = fitz.open(output_path)
@@ -133,13 +137,50 @@ def modify_pdf(pdf_file):
     except Exception as e:
         return None, None, f"Error modifying PDF: {str(e)}", None
 
-# def chat_response(message, history):
-#     if history is None:
-#         history = []
-#     history.append({"role": "user", "content": message})
-#     bot_message = f"You asked: {message}"
-#     history.append({"role": "assistant", "content": bot_message})
-#     return history
+def extract_field_names(pdf_file):
+    if pdf_file is None:
+        return None, "Please upload a PDF file"
+    
+    try:
+        doc = fitz.open(pdf_file.name)
+        field_data = {}
+        # Iterate over each page in the document
+        for page_num, page in enumerate(doc):
+            page_fields = []
+            widgets = page.widgets()  # Get widget annotations on the page
+            if widgets:
+                for widget in widgets:
+                    # Access the field name via widget.field_name
+                    field_name = widget.field_name
+                    page_fields.append(field_name)
+            # Store the field names for the page (pages are 1-indexed for user clarity)
+            field_data[page_num + 1] = page_fields
+        
+        doc.close()
+        return field_data, "Field names extracted successfully!"
+    
+    except Exception as e:
+        return None, f"Error extracting field names: {str(e)}"
+    
+def get_widget_by_field_name(pdf_file, target_field_name):
+    if pdf_file is None:
+        return None, "No PDF file provided"
+    
+    try:
+        doc = fitz.open(pdf_file.name)
+        for page in doc:
+            widgets = page.widgets()
+            if widgets:
+                for widget in widgets:
+                    if widget.field_name == target_field_name:
+                        doc.close()
+                        return widget, f"Widget '{target_field_name}' found."
+        doc.close()
+        return None, f"Widget '{target_field_name}' not found."
+    except Exception as e:
+        return None, f"Error accessing widget: {str(e)}"
+    
+
 
 with gr.Blocks() as demo:
     with gr.Row():

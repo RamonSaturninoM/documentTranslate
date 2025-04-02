@@ -58,3 +58,9 @@ Growing up as first-generation Americans, we often had to translate important do
 - **Improved Editing:** Developing a cleaner PDF modification experience, including direct interaction with the file itself.
 
 ---
+
+## Demo and Devpost
+
+- **https://devpost.com/software/896203?ref_content=existing_user_added_to_software_team&ref_feature=portfolio&ref_medium=email&utm_campaign=software&utm_content=added_to_software_team&utm_medium=email&utm_source=transactional
+
+---

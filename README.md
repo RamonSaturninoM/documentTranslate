@@ -1,4 +1,4 @@
-# DocuChisme
+# DocuChisme (spoiler: we got first place!)
 
 DocuChisme is a translation tool designed to ease the burden of understanding and completing legal documents for first-generation families. Inspired by personal experiences, our tool empowers users with accessible communication and efficient document handling.
 
